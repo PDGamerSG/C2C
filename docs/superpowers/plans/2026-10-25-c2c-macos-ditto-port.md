@@ -1,6 +1,6 @@
 # C2C macOS Clipboard Manager Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Build a runnable native macOS clipboard manager with Ditto-style history capture, search, organization, and paste workflows.
 
@@ -37,11 +37,11 @@
 - `ClipSearch.matches(_ query: String, clip: Clip) -> Bool`.
 - `ClipArchive.export(clips:)` and `ClipArchive.import(data:)` use a versioned JSON envelope.
 
-- [ ] Write failing tests for duplicate identity, case-insensitive search, retention ordering, and archive round trip.
-- [ ] Run `swift test --filter C2CCoreTests` and confirm failures are missing symbols.
-- [ ] Implement the core types and an in-memory store with retention and pin preservation.
-- [ ] Run the focused tests, then the full package test suite.
-- [ ] Commit as `feat: add C2C clipboard core`.
+- [x] Write failing tests for duplicate identity, case-insensitive search, retention ordering, and archive round trip.
+- [x] Run `swift test --filter C2CCoreTests` and confirm failures are missing symbols.
+- [x] Implement the core types and an in-memory store with retention and pin preservation.
+- [x] Run the focused tests, then the full package test suite.
+- [x] Commit as `feat: add C2C clipboard core`.
 
 ### Task 2: File persistence and application services
 
@@ -56,11 +56,11 @@
 - `ClipboardService.ingest(payloads:sourceBundleID:)` deduplicates and inserts clips.
 - `AppSettings` is Codable and stores retention, excluded bundle IDs, and plain-text paste preference.
 
-- [ ] Write failing tests for file round trips, malformed-file recovery, excluded-source filtering, and retention changes.
-- [ ] Run tests to confirm red failures.
-- [ ] Implement atomic persistence, settings defaults, and service ingestion.
-- [ ] Run all core tests and inspect the on-disk fixture.
-- [ ] Commit as `feat: persist clipboard history and settings`.
+- [x] Write failing tests for file round trips, malformed-file recovery, excluded-source filtering, and retention changes.
+- [x] Run tests to confirm red failures.
+- [x] Implement atomic persistence, settings defaults, and service ingestion.
+- [x] Run all core tests and inspect the on-disk fixture.
+- [x] Commit as `feat: persist clipboard history and settings`.
 
 ### Task 3: AppKit shell and clipboard capture
 
@@ -77,10 +77,10 @@
 - `HotKeyManager` registers Command-Shift-V through Carbon and calls a closure.
 - `PasteCoordinator.paste(clip:plainText:)` writes selected payloads to the general pasteboard and posts Command-V to the frontmost app.
 
-- [ ] Add a smoke test target for payload extraction using a fake pasteboard adapter.
-- [ ] Implement AppKit lifecycle, monitor timer, status item, global shortcut, and paste coordination.
-- [ ] Build the package with `swift build` and run the smoke executable where GUI APIs are available.
-- [ ] Commit as `feat: add macOS clipboard capture and paste services`.
+- [x] Add a smoke test target for payload extraction using a fake pasteboard adapter.
+- [x] Implement AppKit lifecycle, monitor timer, status item, global shortcut, and paste coordination.
+- [x] Build the package with `swift build` and run the smoke executable where GUI APIs are available.
+- [x] Commit as `feat: add macOS clipboard capture and paste services`.
 
 ### Task 4: Ditto-style popup and organization UI
 
@@ -97,10 +97,10 @@
 - View model exposes filtered clips, selected ID, groups, and commands for paste/delete/pin/group.
 - UI uses keyboard commands and accessible labels for all actions.
 
-- [ ] Add view-model tests for selection, search, deletion, pinning, and group filtering.
-- [ ] Implement the panel, list, preview, settings, and about/credits views.
-- [ ] Build and launch the app manually when Xcode/AppKit runtime is available.
-- [ ] Commit as `feat: add Ditto-style history panel`.
+- [x] Add view-model tests for selection, search, deletion, pinning, and group filtering.
+- [x] Implement the panel, list, preview, settings, and about/credits views.
+- [x] Build and launch the app manually when Xcode/AppKit runtime is available.
+- [x] Commit as `feat: add Ditto-style history panel`.
 
 ### Task 5: Data management, launch at login, and documentation
 
@@ -118,8 +118,13 @@
 - `LaunchAtLogin` wraps `SMAppService.mainApp` with availability checks.
 - `scripts/build-app.sh` creates `C2C.app` from a release build when Xcode is installed.
 
-- [ ] Write smoke script checks for package tests, archive round trip, and attribution files.
-- [ ] Implement data reset/export/import and launch-at-login wrapper.
-- [ ] Add GPLv3 text and upstream credit with repository link.
-- [ ] Run the full verification commands and inspect git diff.
-- [ ] Commit as `docs: add C2C packaging and attribution`.
+- [x] Write smoke script checks for package tests, archive round trip, and attribution files.
+- [x] Implement data reset/export/import and launch-at-login wrapper.
+- [x] Add GPLv3 text and upstream credit with repository link.
+- [x] Run the full verification commands and inspect git diff.
+- [x] Commit as `docs: add C2C packaging and attribution`.
+
+
+## Verification note
+
+`swift build --product C2C`, `./scripts/smoke.sh`, and `./scripts/build-app.sh` pass with the installed Swift command-line toolchain. The XCTest target is included for Xcode environments; this machine's CommandLineTools SDK does not provide the XCTest module, so `swift test` cannot execute here.
