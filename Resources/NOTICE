@@ -1,0 +1,8 @@
+C2C is an independent macOS clipboard manager inspired by Ditto Clipboard Manager.
+
+Upstream project and original Windows implementation:
+https://github.com/sabrogden/Ditto
+
+Ditto is distributed under the GNU General Public License, version 3.
+This port includes the upstream attribution and license text in COPYING.
+C2C's macOS-specific implementation is provided under GPLv3 as well.
