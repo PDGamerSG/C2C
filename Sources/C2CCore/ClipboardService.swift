@@ -19,7 +19,8 @@ public final class ClipboardService {
     public func ingest(payloads: [ClipPayload], sourceBundleID: String? = nil, description: String? = nil) -> Clip? {
         guard !payloads.isEmpty, !settings.isExcluded(bundleID: sourceBundleID) else { return nil }
         let clip = Clip(sourceBundleID: sourceBundleID, payloads: payloads, description: description)
+        let identity = clip.contentIdentity
         store.upsert(clip)
-        return store.list().first { $0.contentIdentity == clip.contentIdentity }
+        return store.clip(matchingContentIdentity: identity)
     }
 }

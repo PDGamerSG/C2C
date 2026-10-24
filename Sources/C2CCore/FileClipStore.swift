@@ -1,6 +1,6 @@
 import Foundation
 
-public final class FileClipStore: ClipStoreProtocol {
+public final class FileClipStore: ClipStoreProtocol, @unchecked Sendable {
     private struct Snapshot: Codable {
         let version: Int
         let clips: [Clip]
@@ -10,6 +10,10 @@ public final class FileClipStore: ClipStoreProtocol {
 
     private let fileURL: URL
     private let memory: InMemoryClipStore
+    private let persistenceQueue = DispatchQueue(label: "com.c2c.clipboard.persistence", qos: .utility)
+    private let persistenceLock = NSLock()
+    private var pendingSnapshot: Snapshot?
+    private var writeScheduled = false
     private var totalCopies = 0
     private var totalPastes = 0
 
@@ -31,6 +35,7 @@ public final class FileClipStore: ClipStoreProtocol {
         self.totalPastes = snapshot?.totalPastes ?? 0
     }
 
+    public func clip(matchingContentIdentity identity: String) -> Clip? { memory.clip(matchingContentIdentity: identity) }
     public func list() -> [Clip] { memory.list() }
     public func search(_ query: String, groupName: String? = nil) -> [Clip] { memory.search(query, groupName: groupName) }
     public func upsert(_ clip: Clip) { memory.upsert(clip); totalCopies += 1; persist() }
@@ -46,8 +51,37 @@ public final class FileClipStore: ClipStoreProtocol {
         return value
     }
 
+    /// Waits for the latest queued snapshot to reach disk. Call during orderly shutdown or tests.
+    public func flush() {
+        persistenceQueue.sync { flushPendingSnapshots() }
+    }
+
     private func persist() {
         let snapshot = Snapshot(version: 1, clips: memory.list(), totalCopies: totalCopies, totalPastes: totalPastes)
+        var shouldSchedule = false
+        persistenceLock.lock()
+        pendingSnapshot = snapshot
+        if !writeScheduled {
+            writeScheduled = true
+            shouldSchedule = true
+        }
+        persistenceLock.unlock()
+        if shouldSchedule { persistenceQueue.async { [weak self] in self?.flushPendingSnapshots() } }
+    }
+
+    private func flushPendingSnapshots() {
+        while true {
+            persistenceLock.lock()
+            let snapshot = pendingSnapshot
+            pendingSnapshot = nil
+            if snapshot == nil { writeScheduled = false }
+            persistenceLock.unlock()
+            guard let snapshot else { return }
+            write(snapshot)
+        }
+    }
+
+    private func write(_ snapshot: Snapshot) {
         do {
             let data = try JSONEncoder().encode(snapshot)
             try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
