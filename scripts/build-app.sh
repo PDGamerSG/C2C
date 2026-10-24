@@ -2,7 +2,7 @@
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
-VERSION=${C2C_VERSION:-1.0.0}
+VERSION=${C2C_VERSION:-1.0.1}
 swift build -c release --product C2C
 BINARY="$ROOT/.build/arm64-apple-macosx/release/C2C"
 [ -x "$BINARY" ] || BINARY="$ROOT/.build/release/C2C"

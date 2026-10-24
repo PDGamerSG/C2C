@@ -27,7 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         pasteCoordinator.beforePaste = { [weak self] in self?.monitor.ignoreNextChange() }
         panel = HistoryPanelController(store: store, pasteCoordinator: pasteCoordinator) { [weak self] in self?.showSettings() }
         statusItem = StatusItemController(onShow: { [weak self] in self?.panel.show() }, onSettings: { [weak self] in self?.showSettings() }, onQuit: { NSApp.terminate(nil) })
-        hotKey = HotKeyManager()
+        hotKey = HotKeyManager(keyCode: settings.hotKeyKeyCode, modifiers: NSEvent.ModifierFlags(rawValue: settings.hotKeyModifiers))
         hotKey.onPress = { [weak self] in self?.panel.toggle() }
         hotKey.start()
         monitor.start()
@@ -44,6 +44,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if settingsWindow == nil { settingsWindow = SettingsWindowController(settingsURL: settingsURL, settings: settings, store: store, launchAtLogin: login) { [weak self] updated in
                 self?.settings = updated
                 self?.service.update(settings: updated)
+                self?.hotKey.update(keyCode: updated.hotKeyKeyCode, modifiers: NSEvent.ModifierFlags(rawValue: updated.hotKeyModifiers))
             } }
         settingsWindow?.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)

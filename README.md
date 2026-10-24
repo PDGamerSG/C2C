@@ -40,4 +40,4 @@ Build a local release bundle and DMG with:
 ./scripts/system-smoke.sh
 ```
 
-The DMG is written to `dist/C2C-1.0.0.dmg`. Local builds are ad-hoc signed. For distribution outside the test Mac, set `C2C_SIGNING_IDENTITY` to a Developer ID Application identity and notarize the resulting DMG with Apple before publishing.
+The DMG is written to `dist/C2C-1.0.1.dmg`. Local builds are ad-hoc signed. For distribution outside the test Mac, set `C2C_SIGNING_IDENTITY` to a Developer ID Application identity and notarize the resulting DMG with Apple before publishing.

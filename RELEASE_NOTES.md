@@ -1,3 +1,7 @@
+# C2C 1.0.1
+
+Compact borderless history panel and configurable global shortcut recorder.
+
 # C2C 1.0.0
 
 C2C is a local-first macOS clipboard manager inspired by Ditto Clipboard Manager.

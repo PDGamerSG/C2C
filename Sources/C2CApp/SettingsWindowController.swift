@@ -11,6 +11,9 @@ final class SettingsWindowController: NSWindowController {
     private let onSave: (AppSettings) -> Void
     private var aboutWindow: NSWindowController?
     private let limitField = NSTextField(string: "500")
+    private let shortcutField = ShortcutRecorderField(string: "⌘⇧V")
+    private var pendingHotKeyKeyCode: UInt16
+    private var pendingHotKeyModifiers: UInt
     private let plainText = NSButton(checkboxWithTitle: "Paste as plain text by default", target: nil, action: nil)
     private let launch = NSButton(checkboxWithTitle: "Launch C2C at login", target: nil, action: nil)
     private let excludedField = NSTextField(string: "")
@@ -18,6 +21,8 @@ final class SettingsWindowController: NSWindowController {
     init(settingsURL: URL, settings: AppSettings, store: ClipStoreProtocol, launchAtLogin: LaunchAtLogin, onSave: @escaping (AppSettings) -> Void) {
         self.settingsURL = settingsURL
         self.settings = settings
+        self.pendingHotKeyKeyCode = settings.hotKeyKeyCode
+        self.pendingHotKeyModifiers = settings.hotKeyModifiers
         self.store = store
         self.launchAtLogin = launchAtLogin
         self.dataManagement = DataManagementController(store: store)
@@ -47,6 +52,16 @@ final class SettingsWindowController: NSWindowController {
         limitField.stringValue = "\(settings.retentionLimit)"
         limitField.widthAnchor.constraint(equalToConstant: 100).isActive = true
         stack.addArrangedSubview(limitField)
+        stack.addArrangedSubview(NSTextField(labelWithString: "Open clipboard shortcut"))
+        shortcutField.stringValue = settings.hotKeyDescription
+        shortcutField.placeholderString = "Press a shortcut…"
+        shortcutField.widthAnchor.constraint(equalToConstant: 180).isActive = true
+        shortcutField.onShortcut = { [weak self] keyCode, modifiers, description in
+            self?.pendingHotKeyKeyCode = keyCode
+            self?.pendingHotKeyModifiers = modifiers.rawValue
+            self?.shortcutField.stringValue = description
+        }
+        stack.addArrangedSubview(shortcutField)
         stack.addArrangedSubview(plainText)
         plainText.state = settings.plainTextPasteByDefault ? .on : .off
         stack.addArrangedSubview(launch)
@@ -73,6 +88,9 @@ final class SettingsWindowController: NSWindowController {
         settings.retentionLimit = limit
         settings.excludedBundleIDs = excluded
         settings.plainTextPasteByDefault = plainText.state == .on
+        settings.hotKeyKeyCode = pendingHotKeyKeyCode
+        settings.hotKeyModifiers = pendingHotKeyModifiers
+        settings.hotKeyDescription = shortcutField.stringValue
         settings.launchAtLogin = launch.state == .on
         store.retentionLimit = limit
         launchAtLogin.setEnabled(settings.launchAtLogin)

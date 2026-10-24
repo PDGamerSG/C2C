@@ -7,6 +7,7 @@ final class HistoryTableView: NSTableView {
     override func keyDown(with event: NSEvent) { onKeyDown?(event) }
 }
 
+@MainActor
 final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTableViewDelegate, NSSearchFieldDelegate {
     private let store: ClipStoreProtocol
     private let pasteCoordinator: PasteCoordinator
@@ -23,6 +24,7 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
     private let pinButton = NSButton(title: "Pin", target: nil, action: nil)
     private let deleteButton = NSButton(title: "Delete", target: nil, action: nil)
     private let groupButton = NSButton(title: "Group…", target: nil, action: nil)
+    private let settingsButton = NSButton(title: "⚙", target: nil, action: nil)
 
     init(store: ClipStoreProtocol, pasteCoordinator: PasteCoordinator, onSettings: @escaping () -> Void) {
         self.store = store
@@ -37,101 +39,121 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
         let root = NSView()
         root.wantsLayer = true
         root.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.97).cgColor
+        root.layer?.cornerRadius = 14
+        root.layer?.masksToBounds = true
 
         searchField.placeholderString = "Search clipboard history"
-        searchField.delegate = self
+        searchField.focusRingType = .none
         searchField.translatesAutoresizingMaskIntoConstraints = false
+        searchField.delegate = self
         root.addSubview(searchField)
 
         groupFilter.translatesAutoresizingMaskIntoConstraints = false
+        groupFilter.bezelStyle = .rounded
+        groupFilter.controlSize = .small
         groupFilter.target = self
         groupFilter.action = #selector(groupChanged)
         root.addSubview(groupFilter)
 
         let scroll = NSScrollView()
         scroll.hasVerticalScroller = true
+        scroll.borderType = .noBorder
         scroll.drawsBackground = false
         scroll.translatesAutoresizingMaskIntoConstraints = false
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("clip"))
         column.title = "Clipboard"
         tableView.addTableColumn(column)
         tableView.headerView = nil
-        tableView.rowHeight = 56
+        tableView.rowHeight = 42
+        tableView.backgroundColor = .clear
+        tableView.usesAlternatingRowBackgroundColors = false
+        tableView.selectionHighlightStyle = .regular
         tableView.delegate = self
         tableView.dataSource = self
         tableView.target = self
         tableView.doubleAction = #selector(pasteSelectedFromDoubleClick)
         tableView.onKeyDown = { [weak self] event in self?.handleKey(event) }
-        tableView.usesAlternatingRowBackgroundColors = true
         scroll.documentView = tableView
         root.addSubview(scroll)
 
         preview.isEditable = false
         preview.isRichText = false
-        preview.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
-        preview.backgroundColor = NSColor.textBackgroundColor
-        preview.textContainerInset = NSSize(width: 12, height: 12)
+        preview.drawsBackground = false
+        preview.focusRingType = .none
+        preview.font = .systemFont(ofSize: 12)
+        preview.textColor = .secondaryLabelColor
+        preview.textContainerInset = NSSize(width: 10, height: 8)
         preview.translatesAutoresizingMaskIntoConstraints = false
+        preview.wantsLayer = true
+        preview.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.55).cgColor
+        preview.layer?.cornerRadius = 8
         root.addSubview(preview)
 
-        countLabel.textColor = .secondaryLabelColor
-        countLabel.translatesAutoresizingMaskIntoConstraints = false
-        root.addSubview(countLabel)
+        countLabel.textColor = .tertiaryLabelColor
+        countLabel.font = .systemFont(ofSize: 11)
 
-        pinButton.target = self
-        pinButton.action = #selector(togglePin)
-        pinButton.translatesAutoresizingMaskIntoConstraints = false
-        root.addSubview(pinButton)
-        deleteButton.target = self
-        deleteButton.action = #selector(deleteSelected)
-        deleteButton.translatesAutoresizingMaskIntoConstraints = false
-        root.addSubview(deleteButton)
+        [groupButton, pinButton, deleteButton, settingsButton].forEach {
+            $0.isBordered = false
+            $0.bezelStyle = .inline
+            $0.controlSize = .small
+            $0.contentTintColor = .secondaryLabelColor
+            $0.font = .systemFont(ofSize: 11)
+        }
         groupButton.target = self
         groupButton.action = #selector(assignGroup)
-        groupButton.translatesAutoresizingMaskIntoConstraints = false
-        root.addSubview(groupButton)
+        pinButton.target = self
+        pinButton.action = #selector(togglePin)
+        deleteButton.target = self
+        deleteButton.action = #selector(deleteSelected)
+        settingsButton.target = self
+        settingsButton.action = #selector(openSettings)
 
-        let settings = NSButton(title: "Settings…", target: self, action: #selector(openSettings))
-        settings.bezelStyle = .rounded
-        settings.translatesAutoresizingMaskIntoConstraints = false
-        root.addSubview(settings)
+        let footer = NSStackView(views: [countLabel, NSView(), groupButton, pinButton, deleteButton, settingsButton])
+        footer.orientation = .horizontal
+        footer.alignment = .centerY
+        footer.spacing = 4
+        footer.translatesAutoresizingMaskIntoConstraints = false
+        footer.arrangedSubviews[1].setContentHuggingPriority(.defaultLow, for: .horizontal)
+        root.addSubview(footer)
 
         NSLayoutConstraint.activate([
-            searchField.topAnchor.constraint(equalTo: root.topAnchor, constant: 16),
-            searchField.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 16),
+            searchField.topAnchor.constraint(equalTo: root.topAnchor, constant: 12),
+            searchField.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 12),
             searchField.trailingAnchor.constraint(equalTo: groupFilter.leadingAnchor, constant: -8),
+            searchField.heightAnchor.constraint(equalToConstant: 30),
             groupFilter.topAnchor.constraint(equalTo: searchField.topAnchor),
-            groupFilter.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -16),
-            groupFilter.widthAnchor.constraint(equalToConstant: 150),
-            scroll.topAnchor.constraint(equalTo: searchField.bottomAnchor, constant: 12),
-            scroll.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 16),
-            scroll.widthAnchor.constraint(equalTo: root.widthAnchor, multiplier: 0.53),
-            scroll.bottomAnchor.constraint(equalTo: countLabel.topAnchor, constant: -12),
-            preview.topAnchor.constraint(equalTo: scroll.topAnchor),
-            preview.leadingAnchor.constraint(equalTo: scroll.trailingAnchor, constant: 12),
-            preview.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -16),
-            preview.bottomAnchor.constraint(equalTo: scroll.bottomAnchor),
-            countLabel.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 16),
-            countLabel.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -14),
-            groupButton.trailingAnchor.constraint(equalTo: pinButton.leadingAnchor, constant: -8),
-            groupButton.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -10),
-            pinButton.trailingAnchor.constraint(equalTo: deleteButton.leadingAnchor, constant: -8),
-            pinButton.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -10),
-            deleteButton.trailingAnchor.constraint(equalTo: settings.leadingAnchor, constant: -8),
-            deleteButton.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -10),
-            settings.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -16),
-            settings.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -10)
+            groupFilter.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -12),
+            groupFilter.widthAnchor.constraint(equalToConstant: 118),
+            scroll.topAnchor.constraint(equalTo: searchField.bottomAnchor, constant: 8),
+            scroll.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 10),
+            scroll.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -10),
+            scroll.bottomAnchor.constraint(equalTo: preview.topAnchor, constant: -8),
+            preview.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 10),
+            preview.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -10),
+            preview.heightAnchor.constraint(equalToConstant: 72),
+            footer.topAnchor.constraint(equalTo: preview.bottomAnchor, constant: 6),
+            footer.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 12),
+            footer.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -10),
+            footer.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -8),
+            footer.heightAnchor.constraint(equalToConstant: 22)
         ])
         view = root
         reload()
     }
 
+    func focusSearch() {
+        guard let window = view.window else { return }
+        window.makeFirstResponder(searchField)
+    }
+
     func reload() {
+        let selectedGroup = groupFilter.titleOfSelectedItem
         clips = store.list()
         let groups = Set(clips.compactMap(\.groupName)).sorted()
         groupFilter.removeAllItems()
         groupFilter.addItem(withTitle: "All groups")
         groupFilter.addItems(withTitles: groups)
+        if let selectedGroup, groupFilter.itemTitles.contains(selectedGroup) { groupFilter.selectItem(withTitle: selectedGroup) }
         applyFilter()
     }
 
@@ -140,15 +162,21 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
         let group = groupFilter.indexOfSelectedItem > 0 ? groupFilter.titleOfSelectedItem : nil
         filtered = store.search(query, groupName: group)
         tableView.reloadData()
-        countLabel.stringValue = "\(filtered.count) clips"
-        if let selected = selectedClip, let row = filtered.firstIndex(where: { $0.id == selected.id }) { tableView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false) }
-        else if !filtered.isEmpty { tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false); tableViewSelectionDidChange(Notification(name: NSTableView.selectionDidChangeNotification)) }
-        else { preview.string = ""; selectedClip = nil }
+        countLabel.stringValue = "\(filtered.count)"
+        if let selected = selectedClip, let row = filtered.firstIndex(where: { $0.id == selected.id }) {
+            tableView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+            tableViewSelectionDidChange(Notification(name: NSTableView.selectionDidChangeNotification))
+        } else if !filtered.isEmpty {
+            tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+            tableViewSelectionDidChange(Notification(name: NSTableView.selectionDidChangeNotification))
+        } else {
+            preview.string = ""
+            selectedClip = nil
+        }
     }
 
     func controlTextDidChange(_ obj: Notification) { applyFilter() }
     @objc private func groupChanged() { applyFilter() }
-
     func numberOfRows(in tableView: NSTableView) -> Int { filtered.count }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
@@ -163,8 +191,8 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
             cell.addSubview(label)
             cell.textField = label
             NSLayoutConstraint.activate([
-                label.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 10),
-                label.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -10),
+                label.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 8),
+                label.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -8),
                 label.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
             ])
             return cell
@@ -185,7 +213,6 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
     }
 
     @objc private func pasteSelectedFromDoubleClick() { pasteSelected(plainText: false) }
-
     private func pasteSelected(plainText: Bool) {
         guard let clip = selectedClip else { return }
         pasteCoordinator.paste(clip: clip, plainText: plainText)
@@ -202,6 +229,8 @@ final class HistoryViewController: NSViewController, NSTableViewDataSource, NSTa
         default: break
         }
     }
+
+    override func cancelOperation(_ sender: Any?) { view.window?.orderOut(nil) }
 
     @objc private func togglePin() {
         guard let clip = selectedClip else { return }

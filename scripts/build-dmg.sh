@@ -2,7 +2,7 @@
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
-VERSION=${C2C_VERSION:-1.0.0}
+VERSION=${C2C_VERSION:-1.0.1}
 ./scripts/build-app.sh
 mkdir -p dist
 STAGE=$(mktemp -d "${TMPDIR:-/tmp}/c2c-dmg.XXXXXX")
