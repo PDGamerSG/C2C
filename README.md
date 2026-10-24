@@ -30,3 +30,14 @@ History is stored locally under `~/Library/Application Support/C2C/clipboard.jso
 ## Credits and license
 
 C2C is inspired by and compatible with the upstream Ditto project's GPLv3 licensing. See [`Resources/NOTICE`](Resources/NOTICE) and [`Resources/COPYING`](Resources/COPYING). The upstream source repository is https://github.com/sabrogden/Ditto.
+
+## Release artifacts
+
+Build a local release bundle and DMG with:
+
+```sh
+./scripts/build-dmg.sh
+./scripts/system-smoke.sh
+```
+
+The DMG is written to `dist/C2C-1.0.0.dmg`. Local builds are ad-hoc signed. For distribution outside the test Mac, set `C2C_SIGNING_IDENTITY` to a Developer ID Application identity and notarize the resulting DMG with Apple before publishing.
