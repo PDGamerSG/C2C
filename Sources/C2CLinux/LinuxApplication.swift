@@ -15,6 +15,7 @@ public final class LinuxApplication {
     private let paste: LinuxPasteAdapter
     private let settingsStore: LinuxSettingsStore
     private var settings: AppSettings
+    private var pinnedOnly = false
     private var lastIdentity: String?
     private var pollTimer: DispatchSourceTimer?
 
@@ -45,7 +46,7 @@ public final class LinuxApplication {
     }
 
     public func refresh(query: String) {
-        let rows = store.search(query, groupName: nil).map { clip in
+        let rows = store.search(query, groupName: nil).filter { !pinnedOnly || $0.isPinned }.map { clip in
             let title = clip.displayTitle.replacingOccurrences(of: "\t", with: " ").replacingOccurrences(of: "\n", with: " ")
             return "\(clip.id.uuidString)\t\(clip.isPinned ? "1" : "0")\t\(title)"
         }.joined(separator: "\n")
@@ -54,6 +55,11 @@ public final class LinuxApplication {
     }
 
     public func handleSearch(_ query: String) { refresh(query: query) }
+
+    public func setPinnedOnly(_ enabled: Bool) {
+        pinnedOnly = enabled
+        refresh(query: "")
+    }
 
     public func activate(id: String) {
         guard let clip = clip(id: id) else { return }

@@ -27,6 +27,7 @@ let context = CallbackContext(application: application)
 var callbacks = C2CLinuxGTKCallbacks(
     context: Unmanaged.passUnretained(context).toOpaque(),
     on_search: { context, query in Unmanaged<CallbackContext>.fromOpaque(context!).takeUnretainedValue().application.handleSearch(String(cString: query!)) },
+    on_pinned_filter: { context, enabled in Unmanaged<CallbackContext>.fromOpaque(context!).takeUnretainedValue().application.setPinnedOnly(enabled != 0) },
     on_activate: { context, id in Unmanaged<CallbackContext>.fromOpaque(context!).takeUnretainedValue().application.activate(id: String(cString: id!)) },
     on_pin: { context, id in Unmanaged<CallbackContext>.fromOpaque(context!).takeUnretainedValue().application.togglePin(id: String(cString: id!)) },
     on_delete: { context, id in Unmanaged<CallbackContext>.fromOpaque(context!).takeUnretainedValue().application.delete(id: String(cString: id!)) },

@@ -4,6 +4,7 @@
 typedef struct {
     void *context;
     void (*on_search)(void *context, const char *query);
+    void (*on_pinned_filter)(void *context, int enabled);
     void (*on_activate)(void *context, const char *id);
     void (*on_pin)(void *context, const char *id);
     void (*on_delete)(void *context, const char *id);

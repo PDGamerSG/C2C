@@ -25,6 +25,11 @@ static void search_changed(GtkEditable *editable, gpointer data) {
     if (callbacks->on_search) callbacks->on_search(callbacks->context, gtk_editable_get_text(editable));
 }
 
+static void pinned_filter_changed(GtkCheckButton *button, gpointer data) {
+    C2CLinuxGTKCallbacks *callbacks = data;
+    if (callbacks->on_pinned_filter) callbacks->on_pinned_filter(callbacks->context, gtk_check_button_get_active(button));
+}
+
 static void settings_save(GtkWidget *widget, gpointer data) {
     (void)widget;
     GtkWidget **controls = data;
@@ -132,6 +137,10 @@ static void activate(GtkApplication *application, gpointer data) {
     gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(search), "Search clipboard history");
     g_signal_connect(search, "search-changed", G_CALLBACK(search_changed), callbacks);
     gtk_box_append(GTK_BOX(root), search);
+
+    GtkWidget *pinned = gtk_check_button_new_with_label("Pinned only");
+    g_signal_connect(pinned, "toggled", G_CALLBACK(pinned_filter_changed), callbacks);
+    gtk_box_append(GTK_BOX(root), pinned);
 
     history_list = gtk_list_box_new();
     gtk_list_box_set_selection_mode(GTK_LIST_BOX(history_list), GTK_SELECTION_NONE);
