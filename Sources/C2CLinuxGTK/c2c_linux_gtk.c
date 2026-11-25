@@ -79,8 +79,16 @@ static void row_action(GtkWidget *widget, gpointer data) {
     C2CLinuxGTKCallbacks *callbacks = data;
     if (!action || !id) return;
     if (strcmp(action, "activate") == 0 && callbacks->on_activate) callbacks->on_activate(callbacks->context, id);
+    if (strcmp(action, "preview") == 0 && callbacks->on_preview) callbacks->on_preview(callbacks->context, id);
     if (strcmp(action, "pin") == 0 && callbacks->on_pin) callbacks->on_pin(callbacks->context, id);
     if (strcmp(action, "delete") == 0 && callbacks->on_delete) callbacks->on_delete(callbacks->context, id);
+}
+
+static void group_apply(GtkWidget *widget, gpointer data) {
+    C2CLinuxGTKCallbacks *callbacks = data;
+    const char *id = g_object_get_data(G_OBJECT(widget), "c2c-id");
+    GtkWidget *entry = g_object_get_data(G_OBJECT(widget), "c2c-entry");
+    if (callbacks->on_group && id && entry) callbacks->on_group(callbacks->context, id, gtk_editable_get_text(GTK_EDITABLE(entry)));
 }
 
 static void clear_list(void) {
@@ -114,7 +122,17 @@ static void append_row(const char *line) {
     g_object_set_data_full(G_OBJECT(title), "c2c-id", g_strdup(parts[0]), g_free);
     g_signal_connect(title, "clicked", G_CALLBACK(row_action), &active_callbacks);
     gtk_box_append(GTK_BOX(row), title);
+    gtk_box_append(GTK_BOX(row), action_button("Preview", "preview", parts[0], &active_callbacks));
     gtk_box_append(GTK_BOX(row), action_button(strcmp(parts[1], "1") == 0 ? "Unpin" : "Pin", "pin", parts[0], &active_callbacks));
+    GtkWidget *group_entry = gtk_entry_new();
+    gtk_entry_set_placeholder_text(GTK_ENTRY(group_entry), "Group");
+    gtk_widget_set_size_request(group_entry, 90, -1);
+    GtkWidget *group_button = gtk_button_new_with_label("Set group");
+    g_object_set_data_full(G_OBJECT(group_button), "c2c-id", g_strdup(parts[0]), g_free);
+    g_object_set_data(G_OBJECT(group_button), "c2c-entry", group_entry);
+    g_signal_connect(group_button, "clicked", G_CALLBACK(group_apply), &active_callbacks);
+    gtk_box_append(GTK_BOX(row), group_entry);
+    gtk_box_append(GTK_BOX(row), group_button);
     gtk_box_append(GTK_BOX(row), action_button("Delete", "delete", parts[0], &active_callbacks));
     gtk_list_box_append(GTK_LIST_BOX(history_list), row);
     g_strfreev(parts);

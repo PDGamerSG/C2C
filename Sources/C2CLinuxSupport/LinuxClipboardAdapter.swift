@@ -51,6 +51,9 @@ public final class LinuxClipboardAdapter {
         if let html = readOptional(type: "text/html", backend: backend), !html.isEmpty {
             payloads.append(.html(html))
         }
+        if let rtf = readData(type: "text/rtf", backend: backend), !rtf.isEmpty {
+            payloads.append(ClipPayload(kind: .richText, uti: "text/rtf", data: rtf))
+        }
         if let uriList = readOptional(type: "text/uri-list", backend: backend), !uriList.isEmpty {
             let urls = uriList
                 .split(whereSeparator: { $0 == "\n" || $0 == "\r" })

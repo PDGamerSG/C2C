@@ -29,8 +29,10 @@ var callbacks = C2CLinuxGTKCallbacks(
     on_search: { context, query in Unmanaged<CallbackContext>.fromOpaque(context!).takeUnretainedValue().application.handleSearch(String(cString: query!)) },
     on_pinned_filter: { context, enabled in Unmanaged<CallbackContext>.fromOpaque(context!).takeUnretainedValue().application.setPinnedOnly(enabled != 0) },
     on_activate: { context, id in Unmanaged<CallbackContext>.fromOpaque(context!).takeUnretainedValue().application.activate(id: String(cString: id!)) },
+    on_preview: { context, id in Unmanaged<CallbackContext>.fromOpaque(context!).takeUnretainedValue().application.preview(id: String(cString: id!)) },
     on_pin: { context, id in Unmanaged<CallbackContext>.fromOpaque(context!).takeUnretainedValue().application.togglePin(id: String(cString: id!)) },
     on_delete: { context, id in Unmanaged<CallbackContext>.fromOpaque(context!).takeUnretainedValue().application.delete(id: String(cString: id!)) },
+    on_group: { context, id, group in Unmanaged<CallbackContext>.fromOpaque(context!).takeUnretainedValue().application.setGroup(id: String(cString: id!), group: String(cString: group!)) },
     on_clear: { context in Unmanaged<CallbackContext>.fromOpaque(context!).takeUnretainedValue().application.clear() },
     on_settings: { context, json in
         let application = Unmanaged<CallbackContext>.fromOpaque(context!).takeUnretainedValue().application

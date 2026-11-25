@@ -19,7 +19,7 @@ public final class LinuxPasteAdapter {
 
     public func write(_ payloads: [ClipPayload]) throws {
         guard let backend else { throw LinuxClipboardError.helperUnavailable("wl-copy/xclip") }
-        guard let payload = payloads.first(where: { [.text, .html, .file, .image].contains($0.kind) }) else {
+        guard let payload = payloads.first(where: { [.text, .html, .richText, .file, .image].contains($0.kind) }) else {
             throw LinuxClipboardError.helperUnavailable("text-compatible clipboard payload")
         }
         let data: Data
@@ -31,6 +31,7 @@ public final class LinuxPasteAdapter {
             data = payload.data
             switch payload.kind {
             case .html: type = "text/html"
+            case .richText: type = "text/rtf"
             case .image: type = payload.uti
             default: type = "text/plain"
             }

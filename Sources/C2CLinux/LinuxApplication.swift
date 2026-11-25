@@ -61,6 +61,17 @@ public final class LinuxApplication {
         refresh(query: "")
     }
 
+    public func preview(id: String) {
+        guard let clip = clip(id: id) else { return }
+        c2c_linux_set_status("Preview: \(clip.displayTitle)")
+    }
+
+    public func setGroup(id: String, group: String) {
+        guard let uuid = UUID(uuidString: id) else { return }
+        store.setGroup(uuid, groupName: group.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : group)
+        refresh(query: "")
+    }
+
     public func activate(id: String) {
         guard let clip = clip(id: id) else { return }
         do {
