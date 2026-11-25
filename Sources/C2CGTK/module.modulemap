@@ -1,0 +1,4 @@
+module C2CGTK {
+    header "gtk.h"
+    export *
+}

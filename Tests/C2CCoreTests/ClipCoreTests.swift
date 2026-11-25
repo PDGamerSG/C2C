@@ -4,8 +4,8 @@ import XCTest
 final class ClipCoreTests: XCTestCase {
     func testSamePayloadProducesSameIdentity() throws {
         let payload = ClipPayload(kind: .text, uti: "public.utf8-plain-text", data: Data("hello".utf8))
-        let first = Clip(payloads: [payload], sourceBundleID: "com.example.editor")
-        let second = Clip(payloads: [payload], sourceBundleID: "com.example.editor")
+        let first = Clip(sourceBundleID: "com.example.editor", payloads: [payload])
+        let second = Clip(sourceBundleID: "com.example.editor", payloads: [payload])
         XCTAssertEqual(first.contentIdentity, second.contentIdentity)
     }
 
@@ -34,7 +34,7 @@ final class ClipCoreTests: XCTestCase {
     }
 
     func testArchiveRoundTripPreservesClipMetadataAndPayload() throws {
-        let original = Clip(payloads: [ClipPayload.text("archive me")], description: "A note", isPinned: true, groupName: "Work")
+        let original = Clip(isPinned: true, groupName: "Work", payloads: [ClipPayload.text("archive me")], description: "A note")
         let data = try ClipArchive.export(clips: [original])
         let imported = try ClipArchive.import(data: data)
         XCTAssertEqual(imported, [original])

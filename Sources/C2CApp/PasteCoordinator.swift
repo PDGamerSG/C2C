@@ -20,7 +20,7 @@ final class PasteCoordinator {
                 case .text: pasteboard.setData(payload.data, forType: NSPasteboard.PasteboardType("public.utf8-plain-text"))
                 case .html: pasteboard.setData(payload.data, forType: .html)
                 case .richText: pasteboard.setData(payload.data, forType: .rtf)
-                case .image: pasteboard.setData(payload.data, forType: .png)
+                case .image: pasteboard.setData(payload.data, forType: NSPasteboard.PasteboardType(payload.uti))
                 case .file: _ = pasteboard.writeObjects(payload.fileURLs as [NSURL])
                 case .custom: pasteboard.setData(payload.data, forType: NSPasteboard.PasteboardType(payload.uti))
                 }

@@ -9,6 +9,7 @@ final class ClipboardMonitor: NSObject {
     private var timer: Timer?
     private var lastChangeCount: Int
     private var shouldIgnoreNextChange = false
+    var onChange: (() -> Void)?
 
     init(pasteboard: NSPasteboard = .general, service: ClipboardService, sourceBundleID: @escaping () -> String?) {
         self.pasteboard = pasteboard
@@ -39,7 +40,7 @@ final class ClipboardMonitor: NSObject {
             return
         }
         let payloads = readPayloads()
-        _ = service.ingest(payloads: payloads, sourceBundleID: sourceBundleID())
+        if service.ingest(payloads: payloads, sourceBundleID: sourceBundleID()) != nil { onChange?() }
     }
 
     private func readPayloads() -> [ClipPayload] {
@@ -54,8 +55,13 @@ final class ClipboardMonitor: NSObject {
         if types.contains(.rtf), let rtf = pasteboard.data(forType: .rtf) {
             payloads.append(ClipPayload(kind: .richText, uti: NSPasteboard.PasteboardType.rtf.rawValue, data: rtf))
         }
-        if types.contains(.tiff), let image = pasteboard.data(forType: .tiff), let png = Self.pngData(fromTIFF: image) {
-            payloads.append(ClipPayload(kind: .image, uti: "public.png", data: png))
+        for type in [NSPasteboard.PasteboardType.png, .tiff, .init("public.jpeg"), .init("public.heic")] where types.contains(type) {
+            guard let data = pasteboard.data(forType: type) else { continue }
+            let png = type == .png && NSImage(data: data) != nil ? data : Self.pngData(from: data)
+            if let png {
+                payloads.append(ClipPayload(kind: .image, uti: "public.png", data: png))
+                break
+            }
         }
         if types.contains(.fileURL), let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !urls.isEmpty {
             payloads.append(.file(urls: urls))
@@ -63,7 +69,7 @@ final class ClipboardMonitor: NSObject {
         return payloads
     }
 
-    private static func pngData(fromTIFF data: Data) -> Data? {
+    private static func pngData(from data: Data) -> Data? {
         guard let image = NSImage(data: data), let tiff = image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiff) else { return nil }
         return bitmap.representation(using: .png, properties: [:])
     }

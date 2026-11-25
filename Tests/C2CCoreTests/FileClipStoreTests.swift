@@ -7,6 +7,7 @@ final class FileClipStoreTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: url) }
         let store = FileClipStore(url: url)
         store.upsert(Clip(payloads: [.text("persisted")]))
+        store.flush()
         XCTAssertEqual(FileClipStore(url: url).list().first?.contentText, "persisted")
     }
 

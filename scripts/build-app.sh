@@ -4,13 +4,18 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
 VERSION=${C2C_VERSION:-1.0.1}
 swift build -c release --product C2C
-BINARY="$ROOT/.build/arm64-apple-macosx/release/C2C"
-[ -x "$BINARY" ] || BINARY="$ROOT/.build/release/C2C"
+BIN_DIR=$(swift build -c release --show-bin-path)
+BINARY="$BIN_DIR/C2C"
 APP="$ROOT/build/C2C.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BINARY" "$APP/Contents/MacOS/C2C"
 cp Resources/COPYING Resources/NOTICE "$APP/Contents/Resources/"
+ICONSET="$ROOT/.build/C2C.iconset"
+swiftc -swift-version 6 Sources/C2CApp/C2CIcon.swift scripts/IconGenerator/main.swift -o "$ROOT/.build/generate-c2c-icon"
+"$ROOT/.build/generate-c2c-icon" "$ICONSET"
+iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/C2C.icns"
+cp "$ICONSET/icon_512x512@2x.png" Resources/C2C-icon.png
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -19,6 +24,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <key>CFBundleExecutable</key><string>C2C</string>
 <key>CFBundleIdentifier</key><string>com.c2c.clipboard</string>
 <key>CFBundleName</key><string>C2C</string>
+<key>CFBundleIconFile</key><string>C2C.icns</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>$VERSION</string>
 <key>CFBundleVersion</key><string>$VERSION</string>

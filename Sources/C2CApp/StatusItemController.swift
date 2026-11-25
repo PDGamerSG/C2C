@@ -13,7 +13,7 @@ final class StatusItemController: NSObject {
         self.onSettings = onSettings
         self.onQuit = onQuit
         super.init()
-        statusItem.button?.image = NSImage(systemSymbolName: "rectangle.on.rectangle", accessibilityDescription: "C2C Clipboard")
+        statusItem.button?.image = C2CIcon.menuBarImage()
         statusItem.button?.toolTip = "C2C Clipboard"
         let menu = NSMenu()
         menu.addItem(withTitle: "Show Clipboard", action: #selector(showClipboard), keyEquivalent: "v")

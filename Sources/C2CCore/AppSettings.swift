@@ -1,5 +1,9 @@
 import Foundation
 
+public enum AppAppearance: String, Codable, CaseIterable, Sendable {
+    case light, dark, system
+}
+
 public struct AppSettings: Codable, Equatable, Sendable {
     public var retentionLimit: Int
     public var excludedBundleIDs: Set<String>
@@ -8,6 +12,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var hotKeyKeyCode: UInt16
     public var hotKeyModifiers: UInt
     public var hotKeyDescription: String
+    public var appearance: AppAppearance
 
     public static let defaultHotKeyKeyCode: UInt16 = 9 // V
     public static let defaultHotKeyModifiers: UInt = 1_179_648 // command + shift
@@ -19,7 +24,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         launchAtLogin: Bool = false,
         hotKeyKeyCode: UInt16 = AppSettings.defaultHotKeyKeyCode,
         hotKeyModifiers: UInt = AppSettings.defaultHotKeyModifiers,
-        hotKeyDescription: String = "⌘⇧V"
+        hotKeyDescription: String = "⌘⇧V",
+        appearance: AppAppearance = .light
     ) {
         self.retentionLimit = max(1, retentionLimit)
         self.excludedBundleIDs = excludedBundleIDs
@@ -28,6 +34,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.hotKeyKeyCode = hotKeyKeyCode
         self.hotKeyModifiers = hotKeyModifiers
         self.hotKeyDescription = hotKeyDescription
+        self.appearance = appearance
     }
 
     public func isExcluded(bundleID: String?) -> Bool {
@@ -38,6 +45,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case retentionLimit, excludedBundleIDs, plainTextPasteByDefault, launchAtLogin
         case hotKeyKeyCode, hotKeyModifiers, hotKeyDescription
+        case appearance
     }
 
     public init(from decoder: Decoder) throws {
@@ -49,7 +57,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
             launchAtLogin: try values.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false,
             hotKeyKeyCode: try values.decodeIfPresent(UInt16.self, forKey: .hotKeyKeyCode) ?? Self.defaultHotKeyKeyCode,
             hotKeyModifiers: try values.decodeIfPresent(UInt.self, forKey: .hotKeyModifiers) ?? Self.defaultHotKeyModifiers,
-            hotKeyDescription: try values.decodeIfPresent(String.self, forKey: .hotKeyDescription) ?? "⌘⇧V"
+            hotKeyDescription: try values.decodeIfPresent(String.self, forKey: .hotKeyDescription) ?? "⌘⇧V",
+            appearance: try values.decodeIfPresent(AppAppearance.self, forKey: .appearance) ?? .light
         )
     }
 }

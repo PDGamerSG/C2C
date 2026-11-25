@@ -26,16 +26,34 @@ final class HistoryPanelController: NSObject, NSWindowDelegate {
     private let onSettings: () -> Void
     private var panel: HistoryPanel?
     private var content: HistoryViewController?
+    private var outsideClickMonitor: Any?
 
     init(store: ClipStoreProtocol, pasteCoordinator: PasteCoordinator, onSettings: @escaping () -> Void) {
         self.store = store
         self.pasteCoordinator = pasteCoordinator
         self.onSettings = onSettings
+        super.init()
+        NotificationCenter.default.addObserver(self, selector: #selector(applicationDidResignActive), name: NSApplication.didResignActiveNotification, object: NSApp)
+        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
+            self?.panel?.orderOut(nil)
+        }
     }
 
     func toggle() {
         if let panel, panel.isVisible { panel.orderOut(nil) }
         else { show() }
+    }
+
+    func reloadIfVisible() {
+        if panel?.isVisible == true { content?.reload(selection: .keepScrollPosition) }
+    }
+
+    func windowDidResignKey(_ notification: Notification) {
+        panel?.orderOut(nil)
+    }
+
+    @objc private func applicationDidResignActive() {
+        panel?.orderOut(nil)
     }
 
     func show() {
@@ -51,18 +69,20 @@ final class HistoryPanelController: NSObject, NSWindowDelegate {
             panel.hasShadow = true
             panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
             panel.delegate = self
-            panel.setContentSize(NSSize(width: 440, height: 470))
+            panel.setContentSize(NSSize(width: 400, height: 340))
             self.panel = panel
             self.content = viewController
         }
-        content?.reload()
         guard let panel else { return }
-        if let screen = NSScreen.main {
+        if panel.isVisible { content?.reload(selection: .keepScrollPosition) }
+        else { content?.prepareForOpening() }
+        if let screen = NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) }) ?? NSScreen.main {
             let frame = screen.visibleFrame
             let size = panel.frame.size
-            panel.setFrameOrigin(NSPoint(x: frame.maxX - size.width - 16, y: frame.maxY - size.height - 16))
+            panel.setFrameOrigin(NSPoint(x: frame.midX - size.width / 2, y: frame.midY - size.height / 2))
         }
-        NSApp.activate(ignoringOtherApps: true)
+        // A nonactivating panel can take keyboard focus without switching apps.
+        // Activating here races with key-window changes and can dismiss an opening panel.
         panel.makeKeyAndOrderFront(nil)
         content?.focusSearch()
     }

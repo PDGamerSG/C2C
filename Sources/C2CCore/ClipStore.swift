@@ -23,7 +23,9 @@ public protocol ClipStoreProtocol: AnyObject {
     func setPinned(_ id: UUID, pinned: Bool)
     func setGroup(_ id: UUID, groupName: String?)
     func recordPaste(_ id: UUID)
-    func clear(includePinned: Bool)
+    /// Clears unpinned history. A clip must be unpinned before it can be deleted.
+    func clear()
+    @discardableResult func removeExpired() -> Int
     func stats() -> ClipStats
 }
 
@@ -39,6 +41,8 @@ public final class InMemoryClipStore: ClipStoreProtocol {
     private var sortedCache: [Clip]?
     private var copies = 0
     private var pastes = 0
+    private let now: () -> Date
+    public static let retentionInterval: TimeInterval = 30 * 24 * 60 * 60
     public var retentionLimit: Int {
         didSet {
             let normalized = max(1, retentionLimit)
@@ -47,20 +51,23 @@ public final class InMemoryClipStore: ClipStoreProtocol {
         }
     }
 
-    public init(clips: [Clip] = [], retentionLimit: Int = 500) {
+    public init(clips: [Clip] = [], retentionLimit: Int = 500, now: @escaping () -> Date = Date.init) {
         self.clipsByID = Dictionary(uniqueKeysWithValues: clips.map { ($0.id, $0) })
         self.idByContentIdentity = Dictionary(uniqueKeysWithValues: clips.map { ($0.contentIdentity, $0.id) })
         self.sortedCache = nil
         self.retentionLimit = max(1, retentionLimit)
+        self.now = now
         enforceRetention()
     }
 
     public func clip(matchingContentIdentity identity: String) -> Clip? {
+        removeExpired()
         guard let id = idByContentIdentity[identity] else { return nil }
         return clipsByID[id]
     }
 
     public func list() -> [Clip] {
+        removeExpired()
         if let sortedCache { return sortedCache }
         let sorted = clipsByID.values.sorted {
             if $0.isPinned != $1.isPinned { return $0.isPinned }
@@ -77,14 +84,15 @@ public final class InMemoryClipStore: ClipStoreProtocol {
     }
 
     public func upsert(_ clip: Clip) {
+        removeExpired()
         copies += 1
         if let existingID = idByContentIdentity[clip.contentIdentity], let existing = clipsByID[existingID] {
             let merged = Clip(
                 id: existing.id,
                 createdAt: existing.createdAt,
-                updatedAt: Date(),
+                updatedAt: now(),
                 pasteCount: existing.pasteCount,
-                isPinned: existing.isPinned,
+                isPinned: existing.isPinned || clip.isPinned,
                 groupName: existing.groupName,
                 sourceBundleID: clip.sourceBundleID ?? existing.sourceBundleID,
                 payloads: clip.payloads,
@@ -100,7 +108,8 @@ public final class InMemoryClipStore: ClipStoreProtocol {
     }
 
     public func delete(_ id: UUID) {
-        guard let clip = clipsByID.removeValue(forKey: id) else { return }
+        guard let clip = clipsByID[id], !clip.isPinned else { return }
+        clipsByID.removeValue(forKey: id)
         idByContentIdentity.removeValue(forKey: clip.contentIdentity)
         invalidateSortedCache()
     }
@@ -108,7 +117,7 @@ public final class InMemoryClipStore: ClipStoreProtocol {
     public func setPinned(_ id: UUID, pinned: Bool) {
         guard var clip = clipsByID[id], clip.isPinned != pinned else { return }
         clip.isPinned = pinned
-        clip.updatedAt = Date()
+        clip.updatedAt = now()
         clipsByID[id] = clip
         invalidateSortedCache()
         enforceRetention()
@@ -117,7 +126,7 @@ public final class InMemoryClipStore: ClipStoreProtocol {
     public func setGroup(_ id: UUID, groupName: String?) {
         guard var clip = clipsByID[id], clip.groupName != groupName else { return }
         clip.groupName = groupName
-        clip.updatedAt = Date()
+        clip.updatedAt = now()
         clipsByID[id] = clip
         invalidateSortedCache()
     }
@@ -125,29 +134,38 @@ public final class InMemoryClipStore: ClipStoreProtocol {
     public func recordPaste(_ id: UUID) {
         guard var clip = clipsByID[id] else { return }
         clip.pasteCount += 1
-        clip.updatedAt = Date()
+        clip.updatedAt = now()
         clipsByID[id] = clip
         pastes += 1
         invalidateSortedCache()
     }
 
-    public func clear(includePinned: Bool = false) {
-        if includePinned {
-            clipsByID.removeAll(keepingCapacity: true)
-            idByContentIdentity.removeAll(keepingCapacity: true)
-        } else {
-            let retained = clipsByID.values.filter(\.isPinned)
-            clipsByID = Dictionary(uniqueKeysWithValues: retained.map { ($0.id, $0) })
-            idByContentIdentity = Dictionary(uniqueKeysWithValues: retained.map { ($0.contentIdentity, $0.id) })
-        }
+    public func clear() {
+        let retained = clipsByID.values.filter(\.isPinned)
+        clipsByID = Dictionary(uniqueKeysWithValues: retained.map { ($0.id, $0) })
+        idByContentIdentity = Dictionary(uniqueKeysWithValues: retained.map { ($0.contentIdentity, $0.id) })
         invalidateSortedCache()
     }
 
+    @discardableResult
+    public func removeExpired() -> Int {
+        let cutoff = now().addingTimeInterval(-Self.retentionInterval)
+        let expired = clipsByID.values.filter { !$0.isPinned && $0.createdAt <= cutoff }
+        for clip in expired {
+            clipsByID.removeValue(forKey: clip.id)
+            idByContentIdentity.removeValue(forKey: clip.contentIdentity)
+        }
+        if !expired.isEmpty { invalidateSortedCache() }
+        return expired.count
+    }
+
     public func stats() -> ClipStats {
-        ClipStats(totalCopies: copies, totalPastes: pastes, storedClips: clipsByID.count, pinnedClips: clipsByID.values.reduce(into: 0) { $0 += $1.isPinned ? 1 : 0 })
+        removeExpired()
+        return ClipStats(totalCopies: copies, totalPastes: pastes, storedClips: clipsByID.count, pinnedClips: clipsByID.values.reduce(into: 0) { $0 += $1.isPinned ? 1 : 0 })
     }
 
     private func enforceRetention() {
+        removeExpired()
         guard clipsByID.count > retentionLimit else { return }
         var removedAny = false
         while clipsByID.count > retentionLimit {

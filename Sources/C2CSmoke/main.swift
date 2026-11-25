@@ -17,6 +17,7 @@ check(store.search("THIRD", groupName: nil).count == 1, "case-insensitive search
 let archive = try ClipArchive.export(clips: store.list())
 let imported = try ClipArchive.import(data: archive)
 check(imported == store.list(), "archive round trip")
+try runRetentionChecks()
 let benchmarkStore = InMemoryClipStore(retentionLimit: 500)
 let benchmarkStart = DispatchTime.now().uptimeNanoseconds
 for index in 0..<2_000 { benchmarkStore.upsert(Clip(payloads: [.text("benchmark-\(index)")])) }
@@ -36,4 +37,7 @@ check(decodedSettings == customSettings, "shortcut settings round trip")
 let legacySettings = Data("{\"retentionLimit\":25}".utf8)
 let decodedLegacy = try JSONDecoder().decode(AppSettings.self, from: legacySettings)
 check(decodedLegacy.hotKeyDescription == "⌘⇧V", "legacy shortcut defaults")
+let darkSettings = try JSONDecoder().decode(AppSettings.self, from: Data("{\"appearance\":\"dark\"}".utf8))
+let darkJSON = try JSONSerialization.jsonObject(with: JSONEncoder().encode(darkSettings)) as! [String: Any]
+check(darkJSON["appearance"] as? String == "dark", "dark appearance survives settings round trip")
 print("C2C smoke checks passed")

@@ -22,7 +22,7 @@ public final class FileClipStore: ClipStoreProtocol, @unchecked Sendable {
         set { memory.retentionLimit = newValue; persist() }
     }
 
-    public init(url: URL, retentionLimit: Int = 500) {
+    public init(url: URL, retentionLimit: Int = 500, now: @escaping () -> Date = Date.init) {
         self.fileURL = url
         let snapshot: Snapshot?
         if let data = try? Data(contentsOf: url) {
@@ -30,21 +30,29 @@ public final class FileClipStore: ClipStoreProtocol, @unchecked Sendable {
         } else {
             snapshot = nil
         }
-        self.memory = InMemoryClipStore(clips: snapshot?.clips ?? [], retentionLimit: max(1, retentionLimit))
+        self.memory = InMemoryClipStore(clips: snapshot?.clips ?? [], retentionLimit: max(1, retentionLimit), now: now)
         self.totalCopies = snapshot?.totalCopies ?? 0
         self.totalPastes = snapshot?.totalPastes ?? 0
+        if let snapshot, memory.list().count != snapshot.clips.count { persist() }
     }
 
-    public func clip(matchingContentIdentity identity: String) -> Clip? { memory.clip(matchingContentIdentity: identity) }
-    public func list() -> [Clip] { memory.list() }
-    public func search(_ query: String, groupName: String? = nil) -> [Clip] { memory.search(query, groupName: groupName) }
+    public func clip(matchingContentIdentity identity: String) -> Clip? { removeExpired(); return memory.clip(matchingContentIdentity: identity) }
+    public func list() -> [Clip] { removeExpired(); return memory.list() }
+    public func search(_ query: String, groupName: String? = nil) -> [Clip] { removeExpired(); return memory.search(query, groupName: groupName) }
     public func upsert(_ clip: Clip) { memory.upsert(clip); totalCopies += 1; persist() }
     public func delete(_ id: UUID) { memory.delete(id); persist() }
     public func setPinned(_ id: UUID, pinned: Bool) { memory.setPinned(id, pinned: pinned); persist() }
     public func setGroup(_ id: UUID, groupName: String?) { memory.setGroup(id, groupName: groupName); persist() }
     public func recordPaste(_ id: UUID) { memory.recordPaste(id); totalPastes += 1; persist() }
-    public func clear(includePinned: Bool = false) { memory.clear(includePinned: includePinned); persist() }
+    public func clear() { memory.clear(); persist() }
+    @discardableResult
+    public func removeExpired() -> Int {
+        let removed = memory.removeExpired()
+        if removed > 0 { persist() }
+        return removed
+    }
     public func stats() -> ClipStats {
+        removeExpired()
         var value = memory.stats()
         value.totalCopies = totalCopies
         value.totalPastes = totalPastes
