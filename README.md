@@ -1,75 +1,111 @@
-# C2C
+<p align="center">
+  <img src="./Resources/C2C-icon.png" width="96" height="96" alt="C2C app icon">
+</p>
 
-C2C is a local-first clipboard manager for macOS and Linux, inspired by [Ditto Clipboard Manager](https://github.com/sabrogden/Ditto). It keeps a searchable history of copied text, rich text, HTML, images, and files, with pinning, groups, retention limits, export/import, a menu-bar utility on macOS, and a desktop history window on Linux.
+<h1 align="center">C2C</h1>
 
-C2C is an independent port. It does not include cloud sync, login, telemetry, or the Windows-specific device protocol. Windows clipboard formats are represented by their platform equivalents.
+<p align="center">A local-first clipboard manager for macOS and Linux.</p>
 
-## Downloads
+<p align="center">
+  <a href="https://github.com/PDGamerSG/C2C/releases/latest"><strong>Download</strong></a> ·
+  <a href="#install">Install</a> ·
+  <a href="#build-from-source">Build from source</a> ·
+  <a href="https://github.com/PDGamerSG/C2C/issues">Report an issue</a>
+</p>
 
-The latest release offers a universal DMG for Apple silicon and Intel Macs and separate Linux archives for x86-64 and ARM64. Each release lists the runtime requirements. [GitHub Releases](https://github.com/PDGamerSG/C2C/releases/latest)
+<p align="center">
+  <img src="./.github/readme/macos-history.png" width="440" height="374" alt="C2C history on macOS in dark mode, with a selected clip and its image preview">
+</p>
 
-## Build on macOS
+C2C keeps a searchable history of what you copy so you can find it and paste it again. Pin the snippets you use often, group related clips, or export your history as a JSON archive. Your history stays on your device and works offline.
 
-The repository uses Swift Package Manager and requires macOS 13 or newer. With Xcode or the Swift command-line tools installed:
+## What you get
+
+- **Searchable clipboard history.** Save text, rich text, HTML, images, and file references. The clipboard formats available depend on your platform and the app you copy from.
+- **Pins and groups.** Keep frequently used clips, assign groups, and switch to a pinned-only view.
+- **Automatic cleanup.** Unpinned clips expire 30 days after they were first saved. The history limit can remove them sooner. Pinned clips stay until you unpin them.
+- **A native desktop interface.** On macOS, open the menu-bar history with a configurable shortcut and preview captured images. On Linux, browse your history in a GTK4 window.
+
+## Install
+
+| Platform | Download for 1.0.2 | Requirements |
+| --- | --- | --- |
+| macOS, Apple silicon and Intel | [Universal DMG](https://github.com/PDGamerSG/C2C/releases/download/v1.0.2/C2C-macOS-1.0.2-universal.dmg) | macOS 13 or later |
+| Linux, Intel and AMD | [x86-64 archive](https://github.com/PDGamerSG/C2C/releases/download/v1.0.2/C2C-linux-1.0.2-x86_64.tar.gz) | Built and tested on Ubuntu 24.04 with GTK4 |
+| Linux, ARM devices | [ARM64 archive](https://github.com/PDGamerSG/C2C/releases/download/v1.0.2/C2C-linux-1.0.2-arm64.tar.gz) | Built and tested on Ubuntu 24.04 with GTK4 |
+
+### macOS
+
+Open the DMG, drag C2C to Applications, and launch it. C2C runs in the menu bar. The release DMG is ad-hoc signed, so Gatekeeper may require you to approve the app in **System Settings → Privacy & Security** on first launch.
+
+### Linux
+
+Install the GTK4 runtime and clipboard helper for your desktop session. On Ubuntu 24.04, use one of these commands:
 
 ```sh
-swift build --product C2C
-swift build --product C2CSmoke
-.build/debug/C2CSmoke
+# X11
+sudo apt install libgtk-4-1 xclip
+
+# Wayland on a compositor supported by wl-clipboard
+sudo apt install libgtk-4-1 wl-clipboard
 ```
 
-To assemble an application bundle:
+Extract the archive, then run `./c2c-linux-1.0.2/bin/c2c` from the directory where you extracted it. The archive includes the Swift runtime. Automatic paste uses `xdotool` on X11 or `wtype` on compatible Wayland compositors when installed.
+
+## First run
+
+**macOS.** Copy something, then press **⌘⇧V** or choose **Show Clipboard** from the C2C menu-bar icon. Type to search and use the arrow keys to select a clip. Press **Return** to paste or **⌘ Return** to paste as plain text. Use **Space** with the history list focused to pin or unpin the selected clip. To paste directly into another app, allow C2C under **System Settings → Privacy & Security → Accessibility**.
+
+Open **Settings** from the menu-bar icon to change the shortcut or choose Light, Dark, or System appearance. Appearance changes apply immediately. To change the shortcut, click the shortcut field, press your key combination, and click **Save**.
+
+**Linux.** Leave the C2C window running while you copy. Search the history, use **Pin** to keep a clip, or toggle **Pinned only** to filter the list. Click a clip to put it back on the system clipboard. You can then switch to the destination app and paste.
+
+## Local data
+
+| Platform | History | Settings |
+| --- | --- | --- |
+| macOS | `~/Library/Application Support/C2C/clipboard.json` | `~/Library/Application Support/C2C/settings.json` |
+| Linux | `$XDG_DATA_HOME/c2c/clipboard.json` | `$XDG_CONFIG_HOME/c2c/settings.json` |
+
+Linux defaults to `~/.local/share` and `~/.config` when the XDG variables are unset. Archive exports contain the copied payloads and their metadata, so treat them like your clipboard history.
+
+## Build from source
+
+Clone the repository and install Swift 6 or later. On macOS, you also need Xcode or the Xcode Command Line Tools.
+
+```sh
+git clone https://github.com/PDGamerSG/C2C.git
+cd C2C
+```
+
+### macOS
 
 ```sh
 ./scripts/build-app.sh
 open build/C2C.app
 ```
 
-The app runs as a menu-bar utility. The first launch starts clipboard capture. Press `⌘⇧V` or click the status item to open history. Selecting a row and pressing Return pastes it; `⌘`-Return can be used for plain text after the panel is open.
+To build a universal DMG under `dist/`, run `C2C_MACOS_UNIVERSAL=1 ./scripts/build-dmg.sh`. Set `C2C_SIGNING_IDENTITY` to a Developer ID Application identity for a distribution build and notarize it with Apple.
 
-## Build on Linux
-
-Linux uses the GTK4 desktop target and stores data under `$XDG_DATA_HOME/c2c/clipboard.json` and settings under `$XDG_CONFIG_HOME/c2c/settings.json`. Install Swift 6, GTK4 development files, and `pkg-config`, then run:
+### Linux
 
 ```sh
 sudo apt install libgtk-4-dev pkg-config
 ./scripts/build-linux.sh
-./scripts/linux-smoke.sh
 ```
 
-The build writes an architecture-specific release archive to `dist/`. C2C uses `wl-clipboard` on supported Wayland compositors and `xclip` on X11 for clipboard access. Paste automation uses `wtype` or `xdotool` where supported. The Linux smoke check requires `xvfb`, `xauth`, `xclip`, and Python 3.
+This writes an archive for the build machine’s architecture under `dist/`.
 
-## Data and privacy
+### Checks
 
-Unpinned messages expire **30 days after they were first saved**. Cleanup runs at startup, every minute while C2C is running, after wake, and when history is accessed. Copying or pasting an existing message does not extend its lifetime. The existing configurable history-count limit can remove unpinned items sooner.
+- `./scripts/smoke.sh` exercises the shared store, pin protection, expiration, archive round-trips, and persistence.
+- `./scripts/ui-smoke.sh` checks macOS history, appearance, shortcuts, and image capture using sample data. It writes screenshots to `.build/ui-smoke/`. After building the app, `./scripts/system-smoke.sh` checks bundle launch.
+- `swift test` and `./scripts/linux-smoke.sh` cover the Linux core and adapters and verify X11 clipboard capture. The Linux smoke script requires `xvfb`, `xauth`, `xclip`, and Python 3.
 
-**Pinned messages are kept indefinitely**, survive restarts, and are protected from deletion, clearing history, age cleanup, and count limits. Use the pin beside a row (shown on hover or selection), Space when the list is focused, or the context menu. Unpin a message before deleting it; unpinning one older than 30 days removes it immediately.
+When opening an issue, include your C2C version, OS, and steps to reproduce. For Linux, include whether you use X11 or Wayland. Use sample clips when sharing screenshots or logs. [GitHub Issues](https://github.com/PDGamerSG/C2C/issues)
 
-The compact, borderless history window follows Ditto's list layout: alternating rows, bottom search, and a narrow side strip. Use the bottom ellipsis for pinned-only filtering, groups, and settings; the side chevrons toggle the preview. Arrow keys navigate results while searching. Drag the side strip to move the window.
+## License and credits
 
-History opens centered on the screen under the pointer. Clicking another window or switching apps dismisses it; the shortcut opens it again in the center.
+C2C is inspired by Ditto Clipboard Manager. [Ditto source](https://github.com/sabrogden/Ditto)
 
-History is stored locally under `~/Library/Application Support/C2C/clipboard.json` on macOS or the XDG data directory on Linux. Settings are stored beside it. Export creates a versioned JSON archive containing payload UTIs and metadata. No network connection is required.
-
-## Checks
-
-Settings includes **Appearance → Light / Dark / System**. Appearance changes apply immediately to Settings and clipboard history and are saved automatically. Click the shortcut field, press a combination containing Control, Option, or Command, then click **Save**. C2C registers the shortcut with macOS directly, so opening history does not require Accessibility or Input Monitoring permission. An unavailable combination shows an error and leaves the previous shortcut active. The left and right variants of a modifier key are equivalent. Accessibility permission is still needed to send a paste keystroke into another application.
-
-Copied PNG, TIFF, JPEG, and HEIC images appear as thumbnails in history. Select an image and open the side preview to see a larger version. Image decoding is downsampled and cached; the original captured payload remains available for pasting and export.
-
-Run `./scripts/smoke.sh` for core behavior, pin protection, exact 30-day expiry, import, and on-disk persistence checks. Run `./scripts/ui-smoke.sh` for native AppKit interaction checks and screenshots under `.build/ui-smoke/`. Both use isolated sample data and work with the command-line tools. The XCTest suite (`swift test`) additionally requires a full Xcode installation.
-
-## Credits and license
-
-C2C is inspired by and compatible with the upstream Ditto project's GPLv3 licensing. See [`Resources/NOTICE`](Resources/NOTICE) and [`Resources/COPYING`](Resources/COPYING). The upstream source repository is https://github.com/sabrogden/Ditto.
-
-## Release artifacts
-
-Build a local release bundle and DMG with:
-
-```sh
-C2C_MACOS_UNIVERSAL=1 ./scripts/build-dmg.sh
-./scripts/system-smoke.sh
-```
-
-The universal DMG is written to `dist/C2C-macOS-1.0.2-universal.dmg`. The GitHub DMG is ad-hoc signed. Developer ID distribution requires a `C2C_SIGNING_IDENTITY` and Apple notarization.
+See the [GNU General Public License v3](./Resources/COPYING), [attribution notice](./Resources/NOTICE), and [release notes](./RELEASE_NOTES.md).
