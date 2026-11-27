@@ -8,16 +8,18 @@
 static C2CLinuxGTKCallbacks active_callbacks;
 static GtkWidget *status_label;
 static GtkWidget *history_list;
-static char *pending_rows;
 static GtkWidget *settings_window;
-
-void c2c_linux_set_rows(const char *rows_text);
+static guint poll_source;
 
 static void quit_clicked(GtkWidget *widget, gpointer data) {
     (void)widget;
+    g_application_quit(G_APPLICATION(data));
+}
+
+static gboolean poll_clipboard(gpointer data) {
     C2CLinuxGTKCallbacks *callbacks = data;
-    if (callbacks->on_quit) callbacks->on_quit(callbacks->context);
-    g_application_quit(g_application_get_default());
+    callbacks->on_poll(callbacks->context);
+    return G_SOURCE_CONTINUE;
 }
 
 static void search_changed(GtkEditable *editable, gpointer data) {
@@ -139,6 +141,11 @@ static void append_row(const char *line) {
 }
 
 static void activate(GtkApplication *application, gpointer data) {
+    GList *windows = gtk_application_get_windows(application);
+    if (windows) {
+        gtk_window_present(GTK_WINDOW(windows->data));
+        return;
+    }
     C2CLinuxGTKCallbacks *callbacks = data;
     GtkWidget *window = gtk_application_window_new(application);
     gtk_window_set_title(GTK_WINDOW(window), "C2C Clipboard History");
@@ -162,8 +169,11 @@ static void activate(GtkApplication *application, gpointer data) {
 
     history_list = gtk_list_box_new();
     gtk_list_box_set_selection_mode(GTK_LIST_BOX(history_list), GTK_SELECTION_NONE);
-    gtk_widget_set_vexpand(history_list, TRUE);
-    gtk_box_append(GTK_BOX(root), history_list);
+    GtkWidget *scroll = gtk_scrolled_window_new();
+    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll), GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+    gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), history_list);
+    gtk_widget_set_vexpand(scroll, TRUE);
+    gtk_box_append(GTK_BOX(root), scroll);
 
     status_label = gtk_label_new("Ready");
     gtk_label_set_xalign(GTK_LABEL(status_label), 0.0f);
@@ -179,7 +189,7 @@ static void activate(GtkApplication *application, gpointer data) {
     if (callbacks->on_settings) g_signal_connect(settings, "clicked", G_CALLBACK(show_settings), callbacks);
     if (callbacks->on_export) g_signal_connect_swapped(export_button, "clicked", G_CALLBACK(callbacks->on_export), callbacks->context);
     if (callbacks->on_import) g_signal_connect_swapped(import_button, "clicked", G_CALLBACK(callbacks->on_import), callbacks->context);
-    g_signal_connect(quit, "clicked", G_CALLBACK(quit_clicked), callbacks);
+    g_signal_connect(quit, "clicked", G_CALLBACK(quit_clicked), application);
     gtk_box_append(GTK_BOX(actions), clear);
     gtk_box_append(GTK_BOX(actions), settings);
     gtk_box_append(GTK_BOX(actions), export_button);
@@ -187,7 +197,8 @@ static void activate(GtkApplication *application, gpointer data) {
     gtk_box_append(GTK_BOX(actions), quit);
     gtk_box_append(GTK_BOX(root), actions);
 
-    if (pending_rows) c2c_linux_set_rows(pending_rows);
+    if (callbacks->on_search) callbacks->on_search(callbacks->context, "");
+    if (callbacks->on_poll) poll_source = g_timeout_add(250, poll_clipboard, callbacks);
     gtk_window_present(GTK_WINDOW(window));
 }
 
@@ -197,13 +208,16 @@ int c2c_linux_run(const C2CLinuxGTKCallbacks *callbacks) {
     GtkApplication *application = gtk_application_new("com.c2c.clipboard", G_APPLICATION_DEFAULT_FLAGS);
     g_signal_connect(application, "activate", G_CALLBACK(activate), &active_callbacks);
     int status = g_application_run(G_APPLICATION(application), 0, NULL);
+    if (poll_source) {
+        g_source_remove(poll_source);
+        poll_source = 0;
+    }
     g_object_unref(application);
     return status;
 }
 
 void c2c_linux_set_rows(const char *rows_text) {
-    g_free(pending_rows);
-    pending_rows = g_strdup(rows_text ? rows_text : "");
+    if (!history_list) return;
     clear_list();
     if (!rows_text || !*rows_text) return;
     char **rows = g_strsplit(rows_text, "\n", -1);

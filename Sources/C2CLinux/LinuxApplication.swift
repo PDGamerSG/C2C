@@ -16,8 +16,8 @@ public final class LinuxApplication {
     private let settingsStore: LinuxSettingsStore
     private var settings: AppSettings
     private var pinnedOnly = false
+    private var query = ""
     private var lastIdentity: String?
-    private var pollTimer: DispatchSourceTimer?
 
     public init(dataHome: URL? = nil, configHome: URL? = nil) {
         let dataRoot = dataHome ?? Self.defaultDataHome()
@@ -31,21 +31,11 @@ public final class LinuxApplication {
         paste = LinuxPasteAdapter(clipboard: clipboard)
     }
 
-    public func start() {
-        pollTimer = DispatchSource.makeTimerSource(queue: .main)
-        pollTimer?.schedule(deadline: .now(), repeating: .milliseconds(250))
-        pollTimer?.setEventHandler { [weak self] in self?.pollClipboard() }
-        pollTimer?.resume()
-        refresh(query: "")
-    }
-
     public func stop() {
-        pollTimer?.cancel()
-        pollTimer = nil
         store.flush()
     }
 
-    public func refresh(query: String) {
+    private func refresh() {
         let rows = store.search(query, groupName: nil).filter { !pinnedOnly || $0.isPinned }.map { clip in
             let title = clip.displayTitle.replacingOccurrences(of: "\t", with: " ").replacingOccurrences(of: "\n", with: " ")
             return "\(clip.id.uuidString)\t\(clip.isPinned ? "1" : "0")\t\(title)"
@@ -54,11 +44,14 @@ public final class LinuxApplication {
         c2c_linux_set_status("\(store.list().count) clipboard items")
     }
 
-    public func handleSearch(_ query: String) { refresh(query: query) }
+    public func handleSearch(_ query: String) {
+        self.query = query
+        refresh()
+    }
 
     public func setPinnedOnly(_ enabled: Bool) {
         pinnedOnly = enabled
-        refresh(query: "")
+        refresh()
     }
 
     public func preview(id: String) {
@@ -69,7 +62,7 @@ public final class LinuxApplication {
     public func setGroup(id: String, group: String) {
         guard let uuid = UUID(uuidString: id) else { return }
         store.setGroup(uuid, groupName: group.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : group)
-        refresh(query: "")
+        refresh()
     }
 
     public func activate(id: String) {
@@ -78,7 +71,7 @@ public final class LinuxApplication {
             try paste.write(clip.payloads)
             try paste.sendPaste()
             store.recordPaste(clip.id)
-            refresh(query: "")
+            refresh()
         } catch {
             c2c_linux_set_status(error.localizedDescription)
         }
@@ -87,18 +80,18 @@ public final class LinuxApplication {
     public func togglePin(id: String) {
         guard let clip = clip(id: id) else { return }
         store.setPinned(clip.id, pinned: !clip.isPinned)
-        refresh(query: "")
+        refresh()
     }
 
     public func delete(id: String) {
         guard let uuid = UUID(uuidString: id) else { return }
         store.delete(uuid)
-        refresh(query: "")
+        refresh()
     }
 
     public func clear() {
         store.clear()
-        refresh(query: "")
+        refresh()
     }
 
     public func save(settings updated: AppSettings) {
@@ -135,7 +128,7 @@ public final class LinuxApplication {
             let clips = try ClipArchive.import(data: Data(contentsOf: archiveURL))
             clips.forEach(store.upsert)
             store.flush()
-            refresh(query: "")
+            refresh()
             c2c_linux_set_status("Archive imported from \(archiveURL.path)")
         } catch {
             c2c_linux_set_status("Import unavailable at \(archiveURL.path)")
@@ -158,15 +151,14 @@ public final class LinuxApplication {
         }
     }
 
-    private func pollClipboard() {
-        _ = store.removeExpired()
+    public func pollClipboard() {
+        let removed = store.removeExpired()
         let payloads = clipboard.readPayloads()
-        guard !payloads.isEmpty else { return }
-        let identity = Clip(payloads: payloads).contentIdentity
-        guard identity != lastIdentity else { return }
+        let identity = payloads.isEmpty ? nil : Clip(payloads: payloads).contentIdentity
+        let changed = identity != lastIdentity
         lastIdentity = identity
-        _ = service.ingest(payloads: payloads)
-        refresh(query: "")
+        if changed && identity != nil { service.ingest(payloads: payloads) }
+        if removed > 0 || (changed && identity != nil) { refresh() }
     }
 
     private func clip(id: String) -> Clip? {

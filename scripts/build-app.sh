@@ -2,10 +2,22 @@
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
-VERSION=${C2C_VERSION:-1.0.1}
-swift build -c release --product C2C
-BIN_DIR=$(swift build -c release --show-bin-path)
+VERSION=${C2C_VERSION:-1.0.2}
+if [ "${C2C_MACOS_UNIVERSAL:-0}" = 1 ]; then
+  set -- --arch arm64 --arch x86_64
+else
+  set --
+fi
+swift build -c release "$@" --product C2C
+BIN_DIR=$(swift build -c release "$@" --show-bin-path)
 BINARY="$BIN_DIR/C2C"
+if [ "$#" -gt 0 ]; then
+  ARCHS=$(lipo -archs "$BINARY")
+  case "$ARCHS" in
+    "x86_64 arm64"|"arm64 x86_64") ;;
+    *) echo "Expected a universal macOS binary, found $ARCHS" >&2; exit 1 ;;
+  esac
+fi
 APP="$ROOT/build/C2C.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -15,7 +27,6 @@ ICONSET="$ROOT/.build/C2C.iconset"
 swiftc -swift-version 6 Sources/C2CApp/C2CIcon.swift scripts/IconGenerator/main.swift -o "$ROOT/.build/generate-c2c-icon"
 "$ROOT/.build/generate-c2c-icon" "$ICONSET"
 iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/C2C.icns"
-cp "$ICONSET/icon_512x512@2x.png" Resources/C2C-icon.png
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

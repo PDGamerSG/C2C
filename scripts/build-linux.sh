@@ -11,7 +11,13 @@ pkg-config --exists gtk4 || {
   exit 1
 }
 
-swift build -c release --product C2CLinux
+case "$(uname -m)" in
+  x86_64) ARCH=x86_64 ;;
+  aarch64) ARCH=arm64 ;;
+  *) echo "Unsupported Linux architecture: $(uname -m)" >&2; exit 1 ;;
+esac
+
+swift build -c release --static-swift-stdlib --product C2CLinux
 BIN_DIR=$(swift build -c release --show-bin-path)
 STAGE=$(mktemp -d "${TMPDIR:-/tmp}/c2c-linux.XXXXXX")
 trap 'rm -rf "$STAGE"' EXIT
@@ -34,7 +40,7 @@ StartupWMClass=com.c2c.clipboard
 DESKTOP
 
 mkdir -p dist
-TARBALL="$ROOT/dist/C2C-linux-$VERSION.tar.gz"
+TARBALL="$ROOT/dist/C2C-linux-$VERSION-$ARCH.tar.gz"
 tar -C "$STAGE" -czf "$TARBALL" "c2c-linux-$VERSION"
 tar -tzf "$TARBALL" | grep -q "/bin/c2c$"
 tar -tzf "$TARBALL" | grep -q "/share/applications/c2c.desktop$"

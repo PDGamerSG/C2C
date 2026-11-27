@@ -38,11 +38,12 @@ public final class LinuxPasteAdapter {
         }
         switch backend {
         case .wayland:
-            guard lookup("wl-copy") != nil else { throw LinuxClipboardError.helperUnavailable("wl-copy") }
-            _ = try run(lookup("wl-copy")!, ["--type", type], data)
+            guard let executable = lookup("wl-copy") else { throw LinuxClipboardError.helperUnavailable("wl-copy") }
+            _ = try run(executable, ["--type", type], data)
         case .x11:
-            guard lookup("xclip") != nil else { throw LinuxClipboardError.helperUnavailable("xclip") }
-            _ = try run(lookup("xclip")!, ["-selection", "clipboard", "-t", type, "-i"], data)
+            guard let executable = lookup("xclip") else { throw LinuxClipboardError.helperUnavailable("xclip") }
+            let target = type == "text/plain" ? "UTF8_STRING" : type
+            _ = try run(executable, ["-selection", "clipboard", "-t", target, "-i"], data)
         }
     }
 
@@ -61,19 +62,18 @@ public final class LinuxPasteAdapter {
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
         let inputPipe = Pipe()
-        let outputPipe = Pipe()
-        let errorPipe = Pipe()
         process.standardInput = inputPipe
-        process.standardOutput = outputPipe
-        process.standardError = errorPipe
+        // Clipboard helpers may keep a background owner alive after the command returns.
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
         try process.run()
-        inputPipe.fileHandleForWriting.write(input)
-        inputPipe.fileHandleForWriting.closeFile()
+        let inputResult = Result { try inputPipe.fileHandleForWriting.write(contentsOf: input) }
+        try? inputPipe.fileHandleForWriting.close()
         process.waitUntilExit()
         guard process.terminationStatus == 0 else {
-            let message = String(data: errorPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-            throw LinuxClipboardError.commandFailed(executable, process.terminationStatus, message.trimmingCharacters(in: .whitespacesAndNewlines))
+            throw LinuxClipboardError.commandFailed(executable, process.terminationStatus, "")
         }
-        return outputPipe.fileHandleForReading.readDataToEndOfFile()
+        try inputResult.get()
+        return Data()
     }
 }

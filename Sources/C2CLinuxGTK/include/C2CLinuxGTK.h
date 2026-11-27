@@ -3,6 +3,7 @@
 
 typedef struct {
     void *context;
+    void (*on_poll)(void *context);
     void (*on_search)(void *context, const char *query);
     void (*on_pinned_filter)(void *context, int enabled);
     void (*on_activate)(void *context, const char *id);
@@ -14,7 +15,6 @@ typedef struct {
     void (*on_settings)(void *context, const char *settings_json);
     void (*on_export)(void *context);
     void (*on_import)(void *context);
-    void (*on_quit)(void *context);
 } C2CLinuxGTKCallbacks;
 
 int c2c_linux_run(const C2CLinuxGTKCallbacks *callbacks);

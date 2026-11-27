@@ -4,7 +4,11 @@ C2C is a local-first clipboard manager for macOS and Linux, inspired by [Ditto C
 
 C2C is an independent port. It does not include cloud sync, login, telemetry, or the Windows-specific device protocol. Windows clipboard formats are represented by their platform equivalents.
 
-## Build
+## Downloads
+
+The latest release offers a universal DMG for Apple silicon and Intel Macs and separate Linux archives for x86-64 and ARM64. Each release lists the runtime requirements. [GitHub Releases](https://github.com/PDGamerSG/C2C/releases/latest)
+
+## Build on macOS
 
 The repository uses Swift Package Manager and requires macOS 13 or newer. With Xcode or the Swift command-line tools installed:
 
@@ -33,7 +37,7 @@ sudo apt install libgtk-4-dev pkg-config
 ./scripts/linux-smoke.sh
 ```
 
-The release archive is written to `dist/C2C-linux-1.0.2.tar.gz`. At runtime, C2C uses `wl-paste` and `wl-copy` on Wayland or `xclip` on X11. `wtype` or `xdotool` is used for paste delivery. Clipboard capture and history remain available when optional helpers are missing, and the status line reports unavailable operations. Wayland compositors can restrict global shortcut registration and synthetic paste, so those operations depend on the compositor's supported helper.
+The build writes an architecture-specific release archive to `dist/`. C2C uses `wl-clipboard` on supported Wayland compositors and `xclip` on X11 for clipboard access. Paste automation uses `wtype` or `xdotool` where supported. The Linux smoke check requires `xvfb`, `xauth`, `xclip`, and Python 3.
 
 ## Data and privacy
 
@@ -64,8 +68,8 @@ C2C is inspired by and compatible with the upstream Ditto project's GPLv3 licens
 Build a local release bundle and DMG with:
 
 ```sh
-./scripts/build-dmg.sh
+C2C_MACOS_UNIVERSAL=1 ./scripts/build-dmg.sh
 ./scripts/system-smoke.sh
 ```
 
-The DMG is written to `dist/C2C-1.0.1.dmg`. Local builds are ad-hoc signed. For distribution outside the test Mac, set `C2C_SIGNING_IDENTITY` to a Developer ID Application identity and notarize the resulting DMG with Apple before publishing.
+The universal DMG is written to `dist/C2C-macOS-1.0.2-universal.dmg`. The GitHub DMG is ad-hoc signed. Developer ID distribution requires a `C2C_SIGNING_IDENTITY` and Apple notarization.

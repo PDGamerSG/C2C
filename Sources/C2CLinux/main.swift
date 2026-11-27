@@ -26,6 +26,7 @@ final class CallbackContext {
 let context = CallbackContext(application: application)
 var callbacks = C2CLinuxGTKCallbacks(
     context: Unmanaged.passUnretained(context).toOpaque(),
+    on_poll: { context in Unmanaged<CallbackContext>.fromOpaque(context!).takeUnretainedValue().application.pollClipboard() },
     on_search: { context, query in Unmanaged<CallbackContext>.fromOpaque(context!).takeUnretainedValue().application.handleSearch(String(cString: query!)) },
     on_pinned_filter: { context, enabled in Unmanaged<CallbackContext>.fromOpaque(context!).takeUnretainedValue().application.setPinnedOnly(enabled != 0) },
     on_activate: { context, id in Unmanaged<CallbackContext>.fromOpaque(context!).takeUnretainedValue().application.activate(id: String(cString: id!)) },
@@ -41,10 +42,8 @@ var callbacks = C2CLinuxGTKCallbacks(
         application.updateSettings(partial)
     },
     on_export: { context in Unmanaged<CallbackContext>.fromOpaque(context!).takeUnretainedValue().application.exportArchive() },
-    on_import: { context in Unmanaged<CallbackContext>.fromOpaque(context!).takeUnretainedValue().application.importArchive() },
-    on_quit: { context in Unmanaged<CallbackContext>.fromOpaque(context!).takeUnretainedValue().application.stop() }
+    on_import: { context in Unmanaged<CallbackContext>.fromOpaque(context!).takeUnretainedValue().application.importArchive() }
 )
-application.start()
 let status = c2c_linux_run(&callbacks)
 application.stop()
 exit(Int32(status))

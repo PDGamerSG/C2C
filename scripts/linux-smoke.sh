@@ -3,20 +3,54 @@ set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT"
 
-swift build --product C2CLinux
-BIN_DIR=$(swift build --show-bin-path)
+if [ "$#" -eq 0 ]; then
+  swift build --product C2CLinux
+  set -- "$(swift build --show-bin-path)/C2CLinux"
+fi
+BINARY=$1
 TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/c2c-linux-smoke.XXXXXX")
 trap 'rm -rf "$TMP_ROOT"' EXIT
-XDG_DATA_HOME="$TMP_ROOT/data" XDG_CONFIG_HOME="$TMP_ROOT/config" C2C_LINUX_SELF_TEST=1 "$BIN_DIR/C2CLinux"
+export XDG_DATA_HOME="$TMP_ROOT/data" XDG_CONFIG_HOME="$TMP_ROOT/config"
+C2C_LINUX_SELF_TEST=1 "$BINARY"
 
-if command -v xvfb-run >/dev/null 2>&1 && pkg-config --exists gtk4; then
-  status=0
-  timeout 5s xvfb-run -a env XDG_DATA_HOME="$TMP_ROOT/data" XDG_CONFIG_HOME="$TMP_ROOT/config" "$BIN_DIR/C2CLinux" >/dev/null 2>&1 || status=$?
-  if [ "$status" -ne 124 ]; then
-    echo "GTK headless launch failed with status $status" >&2
-    exit 1
-  fi
-else
-  echo "GTK headless launch skipped: xvfb-run or GTK4 is unavailable"
-fi
+xvfb-run -a env -u WAYLAND_DISPLAY GDK_BACKEND=x11 sh -eu -c '
+  "$1" > "$2/app.log" 2>&1 &
+  app=$!
+  trap "kill $app 2>/dev/null || true; wait $app 2>/dev/null || true" EXIT
+  python3 - "$XDG_DATA_HOME/c2c/clipboard.json" <<PY
+import base64
+import json
+import pathlib
+import subprocess
+import sys
+import time
+
+snapshot = pathlib.Path(sys.argv[1])
+samples = [
+    ("text", "UTF8_STRING", "C2C clipboard smoke — text".encode()),
+    ("image", "image/png", pathlib.Path("Resources/C2C-icon.png").read_bytes()),
+]
+for kind, target, expected in samples:
+    subprocess.run(
+        ["xclip", "-selection", "clipboard", "-i", "-t", target],
+        input=expected, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        check=True, timeout=5,
+    )
+    for attempt in range(100):
+        try:
+            clips = json.loads(snapshot.read_bytes())["clips"]
+            if any(p["kind"] == kind and base64.b64decode(p["data"]) == expected
+                   for clip in clips for p in clip["payloads"]):
+                break
+        except FileNotFoundError:
+            pass
+        time.sleep(0.1)
+    else:
+        sys.exit(f"GTK clipboard capture did not persist {kind}")
+PY
+  kill -0 "$app"
+' c2c-smoke "$BINARY" "$TMP_ROOT" || {
+  if [ -f "$TMP_ROOT/app.log" ]; then cat "$TMP_ROOT/app.log" >&2; fi
+  exit 1
+}
 echo "C2C Linux smoke checks passed"

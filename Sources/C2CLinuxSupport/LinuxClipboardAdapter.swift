@@ -23,7 +23,7 @@ public final class LinuxClipboardAdapter {
     public typealias CommandRunner = (_ executable: String, _ arguments: [String]) throws -> Data
 
     public let backend: LinuxClipboardBackend?
-    private let lookup: ExecutableLookup
+    private let readExecutable: String?
     private let run: CommandRunner
 
     public init(
@@ -31,21 +31,24 @@ public final class LinuxClipboardAdapter {
         executableLookup: @escaping ExecutableLookup = LinuxClipboardAdapter.defaultLookup,
         commandRunner: @escaping CommandRunner = LinuxClipboardAdapter.runCommand
     ) {
-        self.lookup = executableLookup
         self.run = commandRunner
-        if environment["WAYLAND_DISPLAY"] != nil && executableLookup("wl-paste") != nil {
+        if environment["WAYLAND_DISPLAY"] != nil, let executable = executableLookup("wl-paste") {
             backend = .wayland
-        } else if executableLookup("xclip") != nil {
+            readExecutable = executable
+        } else if environment["DISPLAY"] != nil, let executable = executableLookup("xclip") {
             backend = .x11
+            readExecutable = executable
         } else {
             backend = nil
+            readExecutable = nil
         }
     }
 
     public func readPayloads() -> [ClipPayload] {
         guard let backend else { return [] }
         var payloads: [ClipPayload] = []
-        if let text = readText(backend: backend), !text.isEmpty {
+        let textTarget = backend == .x11 ? "UTF8_STRING" : "text/plain"
+        if let text = readOptional(type: textTarget, backend: backend), !text.isEmpty {
             payloads.append(.text(text))
         }
         if let html = readOptional(type: "text/html", backend: backend), !html.isEmpty {
@@ -67,57 +70,38 @@ public final class LinuxClipboardAdapter {
         return payloads
     }
 
-    private func readText(backend: LinuxClipboardBackend) -> String? {
-        let data: Data?
-        switch backend {
-        case .wayland: data = try? run("wl-paste", ["--no-newline", "--type", "text/plain"])
-        case .x11: data = try? run("xclip", ["-selection", "clipboard", "-o", "-t", "text/plain"])
-        }
-        return data.flatMap { String(data: $0, encoding: .utf8) }
-    }
-
     private func readOptional(type: String, backend: LinuxClipboardBackend) -> String? {
         readData(type: type, backend: backend).flatMap { String(data: $0, encoding: .utf8) }
     }
 
     private func readData(type: String, backend: LinuxClipboardBackend) -> Data? {
-        let data: Data?
+        guard let readExecutable else { return nil }
         switch backend {
-        case .wayland: data = try? run("wl-paste", ["--no-newline", "--type", type])
-        case .x11: data = try? run("xclip", ["-selection", "clipboard", "-o", "-t", type])
+        case .wayland: return try? run(readExecutable, ["--no-newline", "--type", type])
+        case .x11: return try? run(readExecutable, ["-selection", "clipboard", "-o", "-t", type])
         }
-        return data
     }
 
     public static func defaultLookup(_ executable: String) -> String? {
-        let path = "/usr/bin/env"
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: path)
-        process.arguments = ["sh", "-c", "command -v \"$1\"", "c2c", executable]
-        let output = Pipe()
-        process.standardOutput = output
-        process.standardError = FileHandle.nullDevice
-        try? process.run()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else { return nil }
-        return String(data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let path = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
+        return path.split(separator: ":")
+            .map { URL(fileURLWithPath: String($0), isDirectory: true).appendingPathComponent(executable).path }
+            .first { FileManager.default.isExecutableFile(atPath: $0) }
     }
 
     public static func runCommand(_ executable: String, _ arguments: [String]) throws -> Data {
-        guard let path = defaultLookup(executable) else { throw LinuxClipboardError.helperUnavailable(executable) }
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: path)
+        process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
         let output = Pipe()
-        let errors = Pipe()
         process.standardOutput = output
-        process.standardError = errors
+        process.standardError = FileHandle.nullDevice
         try process.run()
+        let data = output.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
         guard process.terminationStatus == 0 else {
-            let message = String(data: errors.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-            throw LinuxClipboardError.commandFailed(executable, process.terminationStatus, message.trimmingCharacters(in: .whitespacesAndNewlines))
+            throw LinuxClipboardError.commandFailed(executable, process.terminationStatus, "")
         }
-        return output.fileHandleForReading.readDataToEndOfFile()
+        return data
     }
 }
